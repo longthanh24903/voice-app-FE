@@ -1,0 +1,5 @@
+{
+  "name": "VOICE Elevenlab - Đa luồng API - OK V1",
+  "description": "A web application that converts text to high-quality speech using AI, with customizable voice settings and a history of generated audio for playback and download. Inspired by ElevenLabs.",
+  "requestFramePermissions": []
+}
