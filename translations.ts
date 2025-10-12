@@ -96,6 +96,9 @@ export const translations = {
     page: (current: number, total: number) => `Page ${current} / ${total}`,
     downloadSelected: "Download Selected",
     selectAll: "Select All",
+    clearAllHistory: "Clear All History",
+    confirmClearAllHistory:
+      "Are you sure you want to clear all history? This action cannot be undone.",
     errors: {
       noValidKeys: "Please import at least one valid API key.",
       voiceNotFound:
@@ -207,6 +210,9 @@ export const translations = {
     page: (current: number, total: number) => `Trang ${current} / ${total}`,
     downloadSelected: "Tải về mục đã chọn",
     selectAll: "Chọn tất cả",
+    clearAllHistory: "Xóa toàn bộ lịch sử",
+    confirmClearAllHistory:
+      "Bạn có chắc chắn muốn xóa toàn bộ lịch sử? Hành động này không thể hoàn tác.",
     errors: {
       noValidKeys: "Vui lòng nhập ít nhất một API key hợp lệ.",
       voiceNotFound: "Lỗi ID voice, vui lòng đổi ID khác.",

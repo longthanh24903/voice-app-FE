@@ -344,10 +344,13 @@ const App: React.FC = () => {
         );
       };
 
-      // Reset errors on new generation
-      apiKeys.forEach(
-        (k) => k.hasGenerationError && updateKeyError(k.key, false)
-      );
+      // Reset errors on new generation - only reset if it's not a persistent error
+      apiKeys.forEach((k) => {
+        // Only reset if the error is not a quota/limit error
+        if (k.hasGenerationError && k.info) {
+          updateKeyError(k.key, false);
+        }
+      });
 
       updateHistory({
         status: GenerationStatus.GENERATING,
@@ -372,106 +375,118 @@ const App: React.FC = () => {
         return;
       }
 
-      // --- Job Planning ---
-      const jobs: { text: string; key: string }[] = [];
-      let totalCharsNeeded = textToGenerate.length;
-
-      const keyQuotas = new Map(
-        keysWithEnoughQuota.map((k) => [
-          k.key,
-          k.info!.character_limit - k.info!.character_count,
-        ])
-      );
-
-      // Distribute text across available API keys
-      let keyIndex = 0;
-      const apiKey = keysWithEnoughQuota[keyIndex].key;
-      const availableQuota = keyQuotas.get(apiKey)!;
-
-      // Check if this key has enough quota for the text
-      if (availableQuota >= textToGenerate.length + 100) {
-        // 100 char safety buffer
-        jobs.push({ text: textToGenerate, key: apiKey });
-      } else {
-        // Check if all chunks were assigned to jobs
-        const totalRemaining = Array.from(keyQuotas.values()).reduce(
-          (a, b) => a + b,
-          0
+      // --- Auto-Switch Key Logic ---
+      const generateWithAutoSwitch = async (text: string): Promise<Blob> => {
+        const availableKeys = keysWithEnoughQuota.filter(
+          (k) => !k.hasGenerationError
         );
-        updateHistory({
-          status: GenerationStatus.FAILED,
-          errorMessage: t.errors.textTooLong(totalCharsNeeded, totalRemaining),
-        });
-        return;
-      }
 
-      const workerPool = new Map<
-        string,
-        { key: string; jobs: { text: string }[] }
-      >();
-      for (const job of jobs) {
-        if (!workerPool.has(job.key)) {
-          workerPool.set(job.key, { key: job.key, jobs: [] });
+        if (availableKeys.length === 0) {
+          throw new Error("No available API keys");
         }
-        workerPool.get(job.key)!.jobs.push({ text: job.text });
-      }
 
-      // --- Execution ---
-      const totalChunks = jobs.length;
-      let completedChunks = 0;
-      const audioBlobs: Blob[] = new Array(totalChunks).fill(null);
-      let hasFailed = false;
+        // Sort keys by available quota (highest first)
+        const sortedKeys = availableKeys.sort(
+          (a, b) =>
+            b.info!.character_limit -
+            b.info!.character_count -
+            (a.info!.character_limit - a.info!.character_count)
+        );
 
-      const workerPromises = Array.from(workerPool.values()).map(
-        async (worker) => {
-          for (const job of worker.jobs) {
-            if (hasFailed) return; // Stop if another worker has failed
+        let lastError: Error | null = null;
 
-            const jobIndex = jobs.findIndex(
-              (j) => j.text === job.text && j.key === worker.key
+        for (const keyInfo of sortedKeys) {
+          try {
+            console.log(`Trying key: ${keyInfo.key.substring(0, 8)}...`);
+
+            const audioBlob = await generateSpeech(
+              text,
+              settings,
+              keyInfo.key,
+              selectedVoiceId,
+              selectedModel.id
             );
 
-            try {
-              const audioBlob = await generateSpeech(
-                job.text,
-                settings,
-                worker.key,
-                selectedVoiceId,
-                selectedModel.id
-              );
-              audioBlobs[jobIndex] = audioBlob;
-              completedChunks++;
-              updateHistory({
-                progress: Math.round((completedChunks / totalChunks) * 100),
-              });
-            } catch (error: any) {
-              hasFailed = true;
-              const isVoiceError = error.message.includes("was not found");
-              if (isVoiceError) {
-                alert(t.errors.voiceNotFound);
-              }
-              updateHistory({
-                status: GenerationStatus.FAILED,
-                errorMessage: error.message || "Unknown generation error",
-              });
-              updateKeyError(worker.key, true);
-              return;
+            console.log(`Success with key: ${keyInfo.key.substring(0, 8)}...`);
+            return audioBlob;
+          } catch (error: any) {
+            console.log(
+              `Key ${keyInfo.key.substring(0, 8)}... failed:`,
+              error.message
+            );
+            lastError = error;
+
+            // Check error type to determine if we should retry with other keys
+            const isVoiceError = error.message.includes("was not found");
+            const isQuotaError =
+              error.message.includes("character_limit_reached") ||
+              error.message.includes("quota") ||
+              error.message.includes("limit");
+            const isAuthError =
+              error.message.includes("Invalid API Key") ||
+              error.message.includes("401");
+
+            // Mark this key as having generation error
+            updateKeyError(keyInfo.key, true);
+
+            // Don't retry for voice errors or auth errors
+            if (isVoiceError) {
+              alert(t.errors.voiceNotFound);
+              throw error;
             }
+
+            if (isAuthError) {
+              console.log(
+                `Key ${keyInfo.key.substring(
+                  0,
+                  8
+                )}... has auth error, skipping retry`
+              );
+              continue;
+            }
+
+            if (isQuotaError) {
+              console.log(
+                `Key ${keyInfo.key.substring(
+                  0,
+                  8
+                )}... quota exceeded, trying next key`
+              );
+              continue;
+            }
+
+            // For other errors, continue to next key
+            console.log(
+              `Key ${keyInfo.key.substring(
+                0,
+                8
+              )}... had other error, trying next key`
+            );
+            continue;
           }
         }
-      );
 
-      await Promise.all(workerPromises);
+        // If we get here, all keys failed
+        throw lastError || new Error("All API keys failed");
+      };
 
-      if (!hasFailed) {
-        const finalBlob = new Blob(audioBlobs.filter(Boolean), {
-          type: "audio/mpeg",
-        });
-        const url = URL.createObjectURL(finalBlob);
+      try {
+        const audioBlob = await generateWithAutoSwitch(textToGenerate);
+        const url = URL.createObjectURL(audioBlob);
         updateHistory({
           status: GenerationStatus.COMPLETED,
           audioUrl: url,
           progress: 100,
+        });
+      } catch (error: any) {
+        const errorMessage = error.message || "All API keys failed";
+        const hasTriedMultipleKeys = keysWithEnoughQuota.length > 1;
+
+        updateHistory({
+          status: GenerationStatus.FAILED,
+          errorMessage: hasTriedMultipleKeys
+            ? `${errorMessage} (Tried ${keysWithEnoughQuota.length} keys)`
+            : errorMessage,
         });
       }
     },
@@ -577,6 +592,10 @@ const App: React.FC = () => {
         item.id === id ? { ...item, customName: newName } : item
       )
     );
+  }, []);
+
+  const handleClearAllHistory = useCallback(() => {
+    setHistory([]);
   }, []);
 
   const handleRegenerate = useCallback(
@@ -763,6 +782,7 @@ const App: React.FC = () => {
                 onRenameItem={handleRenameHistoryItem}
                 onRegenerateItem={handleRegenerate}
                 onPlayAudio={handlePlayAudio}
+                onClearAllHistory={handleClearAllHistory}
                 t={t}
               />
             )}
