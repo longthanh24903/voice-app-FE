@@ -24,6 +24,9 @@ import { GlobalAudioPlayer } from "./components/GlobalAudioPlayer";
 import { translations } from "./translations";
 import { VoiceSelectionModal } from "./components/VoiceSelectionModal";
 import { SettingsTab } from "./components/SettingsTab";
+import { ProxySettings } from "./components/ProxySettings";
+import { Modal, Button } from "antd";
+import { FiShuffle } from "react-icons/fi";
 
 export const VOICES: Voice[] = [
   {
@@ -210,10 +213,12 @@ const App: React.FC = () => {
     text: string | null;
   }>({ url: null, voiceName: null, text: null });
 
+  const [isProxyModalOpen, setProxyModalOpen] = useState(false);
+
   // Proxy settings - Load from localStorage
   const [proxyEnabled, setProxyEnabledState] = useState<boolean>(() => {
     try {
-      const stored = localStorage.getItem('elevenlabs_proxy_enabled');
+      const stored = localStorage.getItem("elevenlabs_proxy_enabled");
       return stored ? JSON.parse(stored) : false;
     } catch {
       return false;
@@ -221,18 +226,22 @@ const App: React.FC = () => {
   });
   const [proxyServerUrl, setProxyServerUrl] = useState<string>(() => {
     try {
-      return localStorage.getItem('elevenlabs_proxy_server_url') || 
-             import.meta.env.VITE_PROXY_SERVER_URL || 
-             "http://localhost:3000";
+      return (
+        localStorage.getItem("elevenlabs_proxy_server_url") ||
+        import.meta.env.VITE_PROXY_SERVER_URL ||
+        "http://localhost:3000"
+      );
     } catch {
       return import.meta.env.VITE_PROXY_SERVER_URL || "http://localhost:3000";
     }
   });
   const [forwardSecret, setForwardSecret] = useState<string>(() => {
     try {
-      return localStorage.getItem('elevenlabs_proxy_secret') || 
-             import.meta.env.VITE_PROXY_SECRET || 
-             "";
+      return (
+        localStorage.getItem("elevenlabs_proxy_secret") ||
+        import.meta.env.VITE_PROXY_SECRET ||
+        ""
+      );
     } catch {
       return import.meta.env.VITE_PROXY_SECRET || "";
     }
@@ -242,7 +251,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadStoredKeys = async () => {
       try {
-        const storedKeys = localStorage.getItem('elevenlabs_api_keys');
+        const storedKeys = localStorage.getItem("elevenlabs_api_keys");
         if (storedKeys) {
           const keys = JSON.parse(storedKeys);
           if (keys.length > 0 && Array.isArray(keys)) {
@@ -250,7 +259,7 @@ const App: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Failed to load API keys from localStorage:', error);
+        console.error("Failed to load API keys from localStorage:", error);
       }
     };
     loadStoredKeys();
@@ -261,10 +270,10 @@ const App: React.FC = () => {
   useEffect(() => {
     if (apiKeys.length > 0) {
       try {
-        const keysToSave = apiKeys.map(k => k.key);
-        localStorage.setItem('elevenlabs_api_keys', JSON.stringify(keysToSave));
+        const keysToSave = apiKeys.map((k) => k.key);
+        localStorage.setItem("elevenlabs_api_keys", JSON.stringify(keysToSave));
       } catch (error) {
-        console.error('Failed to save API keys to localStorage:', error);
+        console.error("Failed to save API keys to localStorage:", error);
       }
     }
   }, [apiKeys]);
@@ -272,16 +281,19 @@ const App: React.FC = () => {
   // Update proxy enabled state in service
   useEffect(() => {
     setProxyEnabled(proxyEnabled);
-    localStorage.setItem('elevenlabs_proxy_enabled', JSON.stringify(proxyEnabled));
+    localStorage.setItem(
+      "elevenlabs_proxy_enabled",
+      JSON.stringify(proxyEnabled)
+    );
   }, [proxyEnabled]);
 
   // Save proxy settings to localStorage
   useEffect(() => {
-    localStorage.setItem('elevenlabs_proxy_server_url', proxyServerUrl);
+    localStorage.setItem("elevenlabs_proxy_server_url", proxyServerUrl);
   }, [proxyServerUrl]);
 
   useEffect(() => {
-    localStorage.setItem('elevenlabs_proxy_secret', forwardSecret);
+    localStorage.setItem("elevenlabs_proxy_secret", forwardSecret);
   }, [forwardSecret]);
 
   const t = translations[language];
@@ -786,7 +798,7 @@ const App: React.FC = () => {
       onClick={() => setActiveTab(tab)}
       className={`px-1 py-2 text-sm font-semibold transition-colors ${
         activeTab === tab
-          ? "text-stone-800 border-b-2 border-stone-800 dark:text-stone-100 dark:border-stone-100"
+          ? "text-primary border-b-2 border-[#3B82F6] dark:text-stone-100 dark:border-stone-100"
           : "text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
       }`}
     >
@@ -795,7 +807,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 flex flex-col">
+    <div className="min-h-screen bg-white dark:bg-stone-950 flex flex-col">
       <Header
         t={t}
         language={language}
@@ -803,8 +815,8 @@ const App: React.FC = () => {
         theme={theme}
         onThemeChange={setTheme}
       />
-      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-8 items-start">
-        <div className="lg:col-span-3 order-2 lg:order-1">
+      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 grid grid-cols-1 lg:grid-cols-6 gap-4 sm:gap-8 items-start">
+        <div className="sticky top-24 lg:col-span-3 order-2 lg:order-1">
           <TextAreaPanel
             tasks={tasks}
             activeTaskId={activeTaskId}
@@ -823,53 +835,77 @@ const App: React.FC = () => {
             t={t}
           />
         </div>
-        <div className="lg:col-span-2 order-1 lg:order-2 bg-white dark:bg-stone-900/50 p-4 sm:p-6 rounded-lg h-auto lg:h-full flex flex-col border border-stone-200 dark:border-stone-700 lg:sticky lg:top-24">
-          <div className="flex-shrink-0 flex items-center gap-6 border-b border-stone-200 dark:border-stone-700 mb-6">
-            <TabButton tab={Tab.SETTINGS} label={t.settings} />
-            <TabButton tab={Tab.HISTORY} label={t.history} />
-          </div>
+        <div className="lg:col-span-3 order-2 lg:order-1 flex flex-col md:flex-row">
+          <div className="lg:w-full order-1 lg:order-2 bg-white dark:bg-stone-900/50 p-4 sm:p-6 rounded-lg h-auto lg:h-full flex flex-col border border-gray-300 dark:border-stone-700 shadow-sm card-hover lg:sticky lg:top-24">
+            <div className="flex-shrink-0 flex items-center justify-between border-b border-stone-200 dark:border-stone-700 mb-6">
+              <div className="flex items-center gap-6">
+                <TabButton tab={Tab.SETTINGS} label={t.settings} />
+                <TabButton tab={Tab.HISTORY} label={t.history} />
+              </div>
+              <button
+                onClick={() => setProxyModalOpen(true)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold border border-stone-300 rounded-md hover:bg-stone-100 dark:border-stone-700 dark:hover:bg-stone-800"
+                title={t.proxySettings}
+              >
+                <FiShuffle />
+                {t.proxySettings}
+              </button>
+            </div>
 
-          <div className="flex-grow overflow-y-auto pr-2 -mr-2">
-            {activeTab === Tab.SETTINGS && (
-              <SettingsTab
-                settings={settings}
-                onSettingsChange={setSettings}
-                onReset={handleResetSettings}
-                onImportKeys={handleImportKeys}
-                onRefreshKeys={refreshCurrentKeysInfo}
-                apiKeys={apiKeys}
-                totalUserInfo={totalUserInfo}
-                voices={allVoices}
-                models={MODELS}
-                selectedVoiceId={selectedVoiceId}
-                onVoiceChange={setSelectedVoiceId}
-                onOpenVoiceModal={() => setVoiceModalOpen(true)}
-                selectedModelUiId={selectedModelUiId}
-                onModelChange={setSelectedModelUiId}
-                t={t}
-                isLoading={isLoading}
-                proxyEnabled={proxyEnabled}
-                onProxyEnabledChange={setProxyEnabledState}
-                proxyServerUrl={proxyServerUrl}
-                onProxyServerUrlChange={setProxyServerUrl}
-                forwardSecret={forwardSecret}
-                onForwardSecretChange={setForwardSecret}
-              />
-            )}
-            {activeTab === Tab.HISTORY && (
-              <HistoryTab
-                history={history}
-                onDeleteItem={handleDeleteHistoryItem}
-                onRenameItem={handleRenameHistoryItem}
-                onRegenerateItem={handleRegenerate}
-                onPlayAudio={handlePlayAudio}
-                onClearAllHistory={handleClearAllHistory}
-                t={t}
-              />
-            )}
+            <div className="flex-grow overflow-y-auto pr-2 -mr-2">
+              {activeTab === Tab.SETTINGS && (
+                <SettingsTab
+                  settings={settings}
+                  onSettingsChange={setSettings}
+                  onReset={handleResetSettings}
+                  onImportKeys={handleImportKeys}
+                  onRefreshKeys={refreshCurrentKeysInfo}
+                  apiKeys={apiKeys}
+                  totalUserInfo={totalUserInfo}
+                  voices={allVoices}
+                  models={MODELS}
+                  selectedVoiceId={selectedVoiceId}
+                  onVoiceChange={setSelectedVoiceId}
+                  onOpenVoiceModal={() => setVoiceModalOpen(true)}
+                  selectedModelUiId={selectedModelUiId}
+                  onModelChange={setSelectedModelUiId}
+                  t={t}
+                  isLoading={isLoading}
+                />
+              )}
+              {activeTab === Tab.HISTORY && (
+                <HistoryTab
+                  history={history}
+                  onDeleteItem={handleDeleteHistoryItem}
+                  onRenameItem={handleRenameHistoryItem}
+                  onRegenerateItem={handleRegenerate}
+                  onPlayAudio={handlePlayAudio}
+                  onClearAllHistory={handleClearAllHistory}
+                  t={t}
+                />
+              )}
+            </div>
           </div>
         </div>
       </main>
+      <Modal
+        open={isProxyModalOpen}
+        onCancel={() => setProxyModalOpen(false)}
+        footer={null}
+        title={t.proxySettings}
+        width={720}
+        centered
+      >
+        <ProxySettings
+          enabled={proxyEnabled}
+          onEnabledChange={setProxyEnabledState}
+          proxyServerUrl={proxyServerUrl}
+          onProxyServerUrlChange={setProxyServerUrl}
+          forwardSecret={forwardSecret}
+          onForwardSecretChange={setForwardSecret}
+          t={t}
+        />
+      </Modal>
       <VoiceSelectionModal
         isOpen={isVoiceModalOpen}
         onClose={() => setVoiceModalOpen(false)}

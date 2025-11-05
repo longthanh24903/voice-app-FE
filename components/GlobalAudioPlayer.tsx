@@ -81,7 +81,7 @@ export const GlobalAudioPlayer: React.FC<GlobalAudioPlayerProps> = ({ audioUrl, 
     const downloadFilename = generateFilename(textForFilename);
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 z-20 dark:bg-stone-900 dark:border-stone-800">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 z-20 shadow-lg dark:bg-stone-900 dark:border-stone-800">
             <audio ref={audioRef} src={audioUrl} />
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-4 h-20">

@@ -130,10 +130,10 @@ export const Header: React.FC<HeaderProps> = ({
   onThemeChange,
 }) => {
   return (
-    <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-10 border-b border-stone-200 dark:bg-stone-900/80 dark:border-stone-800">
+    <header className="bg-blue-500 backdrop-blur-sm sticky top-0 z-10 border-b border-gray-300 dark:border-stone-800 shadow-md">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16">
-          <h1 className="text-lg sm:text-xl font-bold text-stone-900 dark:text-white truncate">
+          <h1 className="text-lg sm:text-xl font-bold text-white truncate">
             {t.title}
           </h1>
           <div className="flex items-center gap-2 sm:gap-3">

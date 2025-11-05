@@ -9,6 +9,7 @@ import { CheckCircleIcon } from "./icons/CheckCircleIcon";
 import { AlertCircleIcon } from "./icons/AlertCircleIcon";
 import { InfoIcon } from "./icons/InfoIcon";
 import { PlusIcon } from "./icons/PlusIcon";
+import { Input } from "antd";
 import {
   saveProxiesToStorage,
   loadProxiesFromStorage,
@@ -49,6 +50,8 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
   const [healthError, setHealthError] = useState<string | null>(null);
   const [proxies, setProxies] = useState<ProxyItem[]>([]);
   const [newProxyValue, setNewProxyValue] = useState("");
+  const [bulkInput, setBulkInput] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const logIntervalRef = useRef<number | null>(null);
 
@@ -140,6 +143,69 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
     setProxies((prev) => prev.filter((p) => p.id !== id));
   };
 
+  const parseProxyLines = (text: string): string[] => {
+    return text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .filter((line) => {
+        // Accept ip:port:user:pass or http(s)://user:pass@host:port
+        const simple = /^[^:\s]+:\d{2,5}:[^:\s]+:[^:\s]+$/; // host:port:user:pass
+        const urlLike = /^(https?:\/\/)?[^:\s]+:[^@\s]+@[^:\s]+:\d{2,5}$/i;
+        return simple.test(line) || urlLike.test(line);
+      });
+  };
+
+  const handleImportBulk = () => {
+    const lines = parseProxyLines(bulkInput);
+    if (lines.length === 0) return;
+    setProxies((prev) => {
+      const existing = new Set(prev.map((p) => p.value.trim().toLowerCase()));
+      const toAdd: ProxyItem[] = [];
+      for (const v of lines) {
+        const key = v.trim().toLowerCase();
+        if (!existing.has(key)) {
+          existing.add(key);
+          toAdd.push({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            value: v,
+          });
+        }
+      }
+      return [...prev, ...toAdd];
+    });
+    setBulkInput("");
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = String(ev.target?.result || "");
+      const lines = parseProxyLines(text);
+      if (lines.length === 0) return;
+      setProxies((prev) => {
+        const existing = new Set(prev.map((p) => p.value.trim().toLowerCase()));
+        const toAdd: ProxyItem[] = [];
+        for (const v of lines) {
+          const key = v.trim().toLowerCase();
+          if (!existing.has(key)) {
+            existing.add(key);
+            toAdd.push({
+              id:
+                Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              value: v,
+            });
+          }
+        }
+        return [...prev, ...toAdd];
+      });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   const formatTime = (date: Date) => {
     return new Intl.DateTimeFormat("vi-VN", {
       hour: "2-digit",
@@ -188,7 +254,7 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-h-[80vh] overflow-y-auto px-2">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-200">
@@ -198,11 +264,7 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
             {t.proxyRotationDesc}
           </p>
         </div>
-        <Toggle
-          label=""
-          enabled={enabled}
-          onChange={onEnabledChange}
-        />
+        <Toggle label="" enabled={enabled} onChange={onEnabledChange} />
       </div>
 
       {enabled && (
@@ -214,13 +276,12 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
             >
               {t.proxyServerUrl}
             </label>
-            <input
+            <Input
               id="proxy-server-url"
-              type="text"
+              size="middle"
               value={proxyServerUrl}
               onChange={(e) => onProxyServerUrlChange(e.target.value)}
               placeholder="http://localhost:3000"
-              className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg focus:border-stone-500 focus:ring-stone-500 transition-colors text-sm dark:bg-stone-800 dark:border-stone-700 dark:focus:border-stone-400"
             />
           </div>
 
@@ -231,13 +292,12 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
             >
               {t.forwardSecret}
             </label>
-            <input
+            <Input.Password
               id="forward-secret"
-              type="password"
+              size="middle"
               value={forwardSecret}
               onChange={(e) => onForwardSecretChange(e.target.value)}
               placeholder={t.forwardSecretPlaceholder}
-              className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg focus:border-stone-500 focus:ring-stone-500 transition-colors text-sm dark:bg-stone-800 dark:border-stone-700 dark:focus:border-stone-400"
             />
           </div>
 
@@ -248,24 +308,54 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
             <p className="text-xs text-stone-600 dark:text-stone-400 mb-3">
               {t.proxyFormat}
             </p>
-            
+            <div className="mb-3">
+              <textarea
+                value={bulkInput}
+                onChange={(e) => setBulkInput(e.target.value)}
+                rows={6}
+                placeholder={
+                  "Paste proxies (one per line), e.g. 142.111.48.253:7030:user:pass"
+                }
+                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg focus:border-stone-500 focus:ring-stone-500 transition-colors text-sm dark:bg-stone-800 dark:border-stone-700 dark:focus:border-stone-400"
+              />
+              <div className="flex items-center justify-between mt-2">
+                <div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".txt"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-medium text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 underline"
+                  >
+                    {t.uploadFile}
+                  </button>
+                </div>
+                <button
+                  onClick={handleImportBulk}
+                  disabled={!bulkInput.trim()}
+                  className="btn-primary px-4 py-2 disabled:bg-stone-400 dark:disabled:bg-stone-600 text-xs"
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+
             <div className="flex gap-2 mb-3">
-              <input
-                type="text"
+              <Input
+                size="middle"
                 value={newProxyValue}
                 onChange={(e) => setNewProxyValue(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleAddProxy();
-                  }
-                }}
+                onPressEnter={handleAddProxy}
                 placeholder={t.addProxyPlaceholder}
-                className="flex-1 p-2 bg-stone-50 border border-stone-200 rounded-lg focus:border-stone-500 focus:ring-stone-500 transition-colors text-sm dark:bg-stone-800 dark:border-stone-700 dark:focus:border-stone-400"
               />
               <button
                 onClick={handleAddProxy}
                 disabled={!newProxyValue.trim()}
-                className="px-4 py-2 bg-stone-700 text-white font-semibold rounded-lg hover:bg-stone-800 disabled:bg-stone-400 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-white dark:disabled:bg-stone-600 text-sm flex items-center gap-2"
+                className="px-4 py-2 btn-primary disabled:bg-stone-400 dark:disabled:bg-stone-600 text-xs flex items-center gap-2"
               >
                 <PlusIcon className="w-4 h-4" />
                 {t.addProxy}
@@ -273,7 +363,7 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
             </div>
 
             {proxies.length > 0 ? (
-              <div className="space-y-2 max-h-40 overflow-y-auto">
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
                 {proxies.map((proxy) => (
                   <div
                     key={proxy.id}
@@ -303,7 +393,7 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
             <button
               onClick={handleCheckHealth}
               disabled={isCheckingHealth}
-              className="flex items-center gap-2 px-4 py-2 bg-stone-700 text-white font-semibold rounded-lg hover:bg-stone-800 disabled:bg-stone-400 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-white dark:disabled:bg-stone-600 text-sm"
+              className="flex items-center gap-2 px-4 py-2 btn-primary disabled:bg-stone-400 dark:disabled:bg-stone-600 text-xs"
             >
               {isCheckingHealth ? (
                 <>
@@ -352,7 +442,9 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
                 logs.map((log) => (
                   <div
                     key={log.id}
-                    className={`p-2 rounded border text-xs ${getLogBgColor(log.type)}`}
+                    className={`p-2 rounded border text-xs ${getLogBgColor(
+                      log.type
+                    )}`}
                   >
                     <div className="flex items-start gap-2">
                       {getLogIcon(log.type)}

@@ -17,7 +17,7 @@ import { InfoIcon } from "./icons/InfoIcon";
 import { SpinnerIcon } from "./icons/SpinnerIcon";
 import { AlertTriangleIcon } from "./icons/AlertTriangleIcon";
 import { RefreshIcon } from "./icons/RefreshIcon";
-import { ProxySettings } from "./ProxySettings";
+import { Input, Select } from "antd";
 
 interface SettingsTabProps {
   settings: VoiceSettings;
@@ -36,12 +36,6 @@ interface SettingsTabProps {
   onModelChange: (uiId: string) => void;
   t: Translations["en"];
   isLoading: boolean;
-  proxyEnabled: boolean;
-  onProxyEnabledChange: (enabled: boolean) => void;
-  proxyServerUrl: string;
-  onProxyServerUrlChange: (url: string) => void;
-  forwardSecret: string;
-  onForwardSecretChange: (secret: string) => void;
 }
 
 const Tag: React.FC<{ tag: ModelTag }> = ({ tag }) => {
@@ -136,7 +130,7 @@ const ApiKeyManager: React.FC<{
         <button
           onClick={handleImportClick}
           disabled={isLoading || !keysInput.trim()}
-          className="flex items-center justify-center bg-stone-700 text-white font-semibold px-4 py-2 rounded-lg hover:bg-stone-800 disabled:bg-stone-400 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-white dark:disabled:bg-stone-600"
+          className="flex items-center justify-center btn-primary px-4 py-2 disabled:bg-stone-400 dark:disabled:bg-stone-600 text-xs"
         >
           {isLoading ? <SpinnerIcon /> : t.importKeys}
         </button>
@@ -242,16 +236,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onModelChange,
   t,
   isLoading,
-  proxyEnabled,
-  onProxyEnabledChange,
-  proxyServerUrl,
-  onProxyServerUrlChange,
-  forwardSecret,
-  onForwardSecretChange,
 }) => {
-  const [isModelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const modelDropdownRef = useRef<HTMLDivElement>(null);
-
   const selectedVoice = voices.find((v) => v.voice_id === selectedVoiceId);
   const selectedModel =
     models.find((m) => m.uiId === selectedModelUiId) || models[0];
@@ -266,18 +251,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     onSettingsChange((prev) => ({ ...prev, [key]: value }));
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        modelDropdownRef.current &&
-        !modelDropdownRef.current.contains(event.target as Node)
-      ) {
-        setModelDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // Model selection now uses antd Select; no manual dropdown handling needed
 
   const isSettingVisible = (setting: SettingKey) =>
     selectedModel.availableSettings.includes(setting);
@@ -294,16 +268,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </div>
       )}
-
-      <ProxySettings
-        enabled={proxyEnabled}
-        onEnabledChange={onProxyEnabledChange}
-        proxyServerUrl={proxyServerUrl}
-        onProxyServerUrlChange={onProxyServerUrlChange}
-        forwardSecret={forwardSecret}
-        onForwardSecretChange={onForwardSecretChange}
-        t={t}
-      />
 
       <ApiKeyManager
         onImportKeys={onImportKeys}
@@ -335,79 +299,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           >
             {t.customVoiceId}
           </label>
-          <input
+          <Input
             id="custom-voice-id"
-            type="text"
+            size="middle"
             value={selectedVoiceId}
             onChange={(e) => onVoiceChange(e.target.value)}
             placeholder="e.g., 21m00Tcm4TlvDq8ikWAM"
-            className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg focus:border-stone-500 focus:ring-stone-500 transition-colors text-sm dark:bg-stone-800 dark:border-stone-700 dark:focus:border-stone-400"
           />
         </div>
       </div>
 
-      <div className="relative" ref={modelDropdownRef}>
+      <div>
         <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-200 mb-2">
           {t.model}
         </h3>
-        {selectedModel.uiId === "eleven-v3-alpha" ? (
-          <div className="p-[1.5px] rounded-lg bg-gradient-to-r from-cyan-400 via-purple-500 to-orange-400">
-            <button
-              onClick={() => setModelDropdownOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between p-3 bg-stone-50 rounded-[7px] hover:bg-stone-100 transition-colors dark:bg-stone-800 dark:hover:bg-stone-700"
-            >
-              <div className="font-medium">{selectedModel.name}</div>
-              <ChevronRightIcon />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setModelDropdownOpen((prev) => !prev)}
-            className="w-full flex items-center justify-between p-3 bg-stone-50 border border-stone-200 rounded-lg hover:border-stone-400 transition-colors dark:bg-stone-800 dark:border-stone-700 dark:hover:border-stone-500"
-          >
-            <div className="font-medium">{selectedModel.name}</div>
-            <ChevronRightIcon />
-          </button>
-        )}
-        {isModelDropdownOpen && (
-          <div className="absolute z-20 mt-1 w-full bg-white shadow-lg rounded-lg border border-stone-200 max-h-[50vh] overflow-y-auto divide-y divide-stone-200 dark:bg-stone-800 dark:border-stone-700 dark:divide-stone-700">
-            {models.map((model) => (
-              <button
-                key={model.uiId}
-                onClick={() => {
-                  onModelChange(model.uiId);
-                  setModelDropdownOpen(false);
-                }}
-                className="w-full text-left flex items-start justify-between p-4 hover:bg-stone-50 transition-colors dark:hover:bg-stone-700"
-              >
-                <div className="flex-1 pr-4">
-                  <div className="flex items-center flex-wrap gap-2 mb-1">
-                    <h4 className="font-semibold text-stone-800 dark:text-stone-100">
-                      {model.name}
-                    </h4>
-                    {model.tags.map((tag) => (
-                      <Tag key={tag.text} tag={tag} />
-                    ))}
-                  </div>
-                  <p className="text-sm text-stone-600 dark:text-stone-300 mb-3">
-                    {model.description}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {model.languages.map((lang) => (
-                      <span
-                        key={lang}
-                        className="text-xs text-stone-600 bg-stone-100 px-2 py-1 rounded-md dark:bg-stone-700 dark:text-stone-300"
-                      >
-                        {lang}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                {model.uiId === selectedModelUiId && <CheckIcon />}
-              </button>
-            ))}
-          </div>
-        )}
+        <Select
+          size="large"
+          value={selectedModelUiId}
+          onChange={(val) => onModelChange(val)}
+          className="w-full"
+          options={models.map((m) => ({ value: m.uiId, label: m.name }))}
+        />
         {selectedModel.uiId === "eleven-v3-alpha" && (
           <div className="mt-3 bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg text-sm flex gap-3 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800/50">
             <InfoIcon />

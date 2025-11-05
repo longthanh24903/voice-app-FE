@@ -10,6 +10,7 @@ import type { UserInfo, Task } from "../types";
 import type { Translations } from "../translations";
 import { FilePlusIcon } from "./icons/FilePlusIcon";
 import { SearchIcon } from "./icons/SearchIcon";
+import { Input, InputNumber } from "antd";
 
 interface TextAreaPanelProps {
   tasks: Task[];
@@ -166,7 +167,7 @@ const TaskList: React.FC<
             className={`absolute w-full flex items-center justify-between text-left px-3 border-b border-stone-200 dark:border-stone-700/50
                             ${
                               task.id === activeTaskId
-                                ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 font-semibold"
+                                ? "active-task"
                                 : "text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700/50"
                             }`}
           >
@@ -313,9 +314,9 @@ export const TextAreaPanel: React.FC<TextAreaPanelProps> = ({
   const textForBackdrop = text + "\n";
 
   return (
-    <div className="bg-white dark:bg-stone-800/50 flex flex-col lg:flex-row rounded-lg border border-stone-200 dark:border-stone-700 h-[60vh] sm:h-[70vh] min-h-[500px] sm:min-h-[600px] max-h-[800px] sm:max-h-[900px]">
+    <div className="bg-white dark:bg-gray-800/50 flex flex-col lg:flex-row rounded-lg border border-gray-300 dark:border-gray-700 shadow-md card-hover h-[60vh] sm:h-[70vh] min-h-[500px] sm:min-h-[600px] max-h-[800px] sm:max-h-[900px]">
       {/* Left Panel: Task List */}
-      <div className="w-full lg:w-64 flex flex-col border-b lg:border-b-0 lg:border-r border-stone-200 dark:border-stone-700 flex-shrink-0 h-48 lg:h-auto">
+      <div className="w-full lg:w-64 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-300 dark:border-gray-700 flex-shrink-0 h-48 lg:h-auto">
         <div className="p-2 border-b border-stone-200 dark:border-stone-700">
           <div className="flex items-center gap-1 sm:gap-2 mb-2">
             <button
@@ -365,12 +366,12 @@ export const TextAreaPanel: React.FC<TextAreaPanelProps> = ({
           </div>
           <div className="relative">
             <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-400 w-4 h-4" />
-            <input
-              type="text"
+            <Input
+              size="middle"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search tasks..."
-              className="w-full bg-stone-100 dark:bg-stone-900/50 border border-stone-200 dark:border-stone-700 rounded-md pl-8 pr-3 py-1.5 text-sm"
+              className="pl-7"
             />
           </div>
         </div>
@@ -413,13 +414,13 @@ export const TextAreaPanel: React.FC<TextAreaPanelProps> = ({
               <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                 {t.wordsPerTask}:
               </label>
-              <input
-                type="number"
-                min="10"
-                max="500"
+              <InputNumber
+                size="middle"
+                min={10}
+                max={500}
                 value={wordsPerTask}
-                onChange={(e) => setWordsPerTask(Number(e.target.value))}
-                className="w-20 px-2 py-1 text-sm border border-stone-300 dark:border-stone-600 rounded-md bg-white dark:bg-stone-700 dark:text-stone-200"
+                onChange={(v) => setWordsPerTask(Number(v || 0))}
+                className="w-24"
               />
               <button
                 onClick={handleSplitText}
@@ -454,7 +455,7 @@ export const TextAreaPanel: React.FC<TextAreaPanelProps> = ({
                   onClick={onGenerateAll}
                   disabled={isGenerateAllDisabled}
                   title={allButtonTitle}
-                  className="flex items-center justify-center bg-indigo-600 text-white font-semibold px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg hover:bg-indigo-700 disabled:bg-stone-400 disabled:dark:bg-stone-600 disabled:cursor-not-allowed transition-colors text-sm sm:text-base flex-1 sm:flex-none"
+                  className="flex items-center justify-center btn-primary px-3 sm:px-5 py-2 sm:py-2.5 disabled:bg-stone-400 disabled:dark:bg-stone-600 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm flex-1 sm:flex-none"
                 >
                   {isLoading ? <SpinnerIcon /> : t.generateAll}
                 </button>
@@ -463,7 +464,7 @@ export const TextAreaPanel: React.FC<TextAreaPanelProps> = ({
                 onClick={onGenerate}
                 disabled={isSingleGenerateDisabled}
                 title={singleButtonTitle}
-                className="flex items-center justify-center bg-stone-800 text-white font-semibold px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg hover:bg-stone-900 disabled:bg-stone-400 disabled:dark:bg-stone-600 disabled:cursor-not-allowed transition-colors dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-white text-sm sm:text-base flex-1 sm:flex-none"
+                className="flex items-center justify-center btn-primary px-3 sm:px-5 py-2 sm:py-2.5 disabled:bg-stone-400 disabled:dark:bg-stone-600 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm flex-1 sm:flex-none"
               >
                 {isLoading ? <SpinnerIcon /> : t.generate}
               </button>

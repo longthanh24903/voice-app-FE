@@ -122,7 +122,8 @@ export const translations = {
     checking: "Checking...",
     proxyLogs: "Proxy Logs",
     clearLogs: "Clear",
-    noLogsYet: "No logs yet. Proxy logs will appear here when requests are made.",
+    noLogsYet:
+      "No logs yet. Proxy logs will appear here when requests are made.",
     addProxy: "Add Proxy",
     manageProxies: "Manage Proxies",
     proxyList: "Proxy List",
@@ -133,6 +134,7 @@ export const translations = {
     proxiesSaved: "Saved {count} proxies",
     proxiesLoaded: "Loaded {count} proxies",
     noProxies: "No proxies yet",
+    proxySettings: "Proxy Settings",
   },
   vi: {
     title: "Chuyển văn bản thành giọng nói",
@@ -256,7 +258,8 @@ export const translations = {
     checking: "Đang kiểm tra...",
     proxyLogs: "Nhật ký Proxy",
     clearLogs: "Xóa",
-    noLogsYet: "Chưa có nhật ký. Nhật ký proxy sẽ hiển thị ở đây khi có request.",
+    noLogsYet:
+      "Chưa có nhật ký. Nhật ký proxy sẽ hiển thị ở đây khi có request.",
     addProxy: "Thêm Proxy",
     manageProxies: "Quản lý Proxy",
     proxyList: "Danh sách Proxy",
@@ -267,6 +270,7 @@ export const translations = {
     proxiesSaved: "Đã lưu {count} proxy",
     proxiesLoaded: "Đã tải {count} proxy",
     noProxies: "Chưa có proxy nào",
+    proxySettings: "Cài đặt Proxy",
   },
 };
 
