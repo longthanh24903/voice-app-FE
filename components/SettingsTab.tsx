@@ -17,6 +17,7 @@ import { InfoIcon } from "./icons/InfoIcon";
 import { SpinnerIcon } from "./icons/SpinnerIcon";
 import { AlertTriangleIcon } from "./icons/AlertTriangleIcon";
 import { RefreshIcon } from "./icons/RefreshIcon";
+import { ProxySettings } from "./ProxySettings";
 
 interface SettingsTabProps {
   settings: VoiceSettings;
@@ -35,6 +36,12 @@ interface SettingsTabProps {
   onModelChange: (uiId: string) => void;
   t: Translations["en"];
   isLoading: boolean;
+  proxyEnabled: boolean;
+  onProxyEnabledChange: (enabled: boolean) => void;
+  proxyServerUrl: string;
+  onProxyServerUrlChange: (url: string) => void;
+  forwardSecret: string;
+  onForwardSecretChange: (secret: string) => void;
 }
 
 const Tag: React.FC<{ tag: ModelTag }> = ({ tag }) => {
@@ -235,6 +242,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onModelChange,
   t,
   isLoading,
+  proxyEnabled,
+  onProxyEnabledChange,
+  proxyServerUrl,
+  onProxyServerUrlChange,
+  forwardSecret,
+  onForwardSecretChange,
 }) => {
   const [isModelDropdownOpen, setModelDropdownOpen] = useState(false);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
@@ -281,6 +294,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </div>
       )}
+
+      <ProxySettings
+        enabled={proxyEnabled}
+        onEnabledChange={onProxyEnabledChange}
+        proxyServerUrl={proxyServerUrl}
+        onProxyServerUrlChange={onProxyServerUrlChange}
+        forwardSecret={forwardSecret}
+        onForwardSecretChange={onForwardSecretChange}
+        t={t}
+      />
 
       <ApiKeyManager
         onImportKeys={onImportKeys}

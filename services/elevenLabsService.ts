@@ -1,6 +1,22 @@
 import type { VoiceSettings, UserInfo, ApiVoice } from "../types";
+import { proxyService } from "./proxyService";
 
 const API_ENDPOINT_BASE = "https://api.elevenlabs.io/v1";
+
+// Global flag to enable/disable proxy
+let proxyEnabled = false;
+
+/**
+ * Set proxy enabled state
+ */
+export const setProxyEnabled = (enabled: boolean) => {
+  proxyEnabled = enabled;
+};
+
+/**
+ * Get proxy enabled state
+ */
+export const getProxyEnabled = () => proxyEnabled;
 
 /**
  * Generates speech by calling the ElevenLabs API.
@@ -59,11 +75,57 @@ export const generateSpeech = async (
     voice_settings: voiceSettings,
   });
 
-  const response = await fetch(apiEndpoint, {
-    method: "POST",
-    headers: headers,
-    body: body,
-  });
+  let response: Response;
+  
+  if (proxyEnabled) {
+    // Use proxy
+    const proxyResponse = await proxyService.makeRequest({
+      url: apiEndpoint,
+      method: "POST",
+      headers,
+      body: JSON.parse(body),
+    });
+
+    // Check if response is error
+    if (!proxyResponse.success || proxyResponse.status !== 200) {
+      let errorMessage = `API Error: ${proxyResponse.status}`;
+      try {
+        if (typeof proxyResponse.body === 'string') {
+          const errorData = JSON.parse(proxyResponse.body);
+          errorMessage = errorData.detail?.message || errorMessage;
+        } else if (typeof proxyResponse.body === 'object') {
+          errorMessage = proxyResponse.body.detail?.message || errorMessage;
+        }
+      } catch {
+        // Ignore parse errors
+      }
+      throw new Error(errorMessage);
+    }
+
+    // For audio responses, proxyService returns Blob directly
+    if (proxyResponse.body instanceof Blob) {
+      return proxyResponse.body;
+    }
+    
+    // If body is not a blob, it might be an error response
+    // Try to create a Response object for error handling
+    const responseBody = typeof proxyResponse.body === 'string' 
+      ? proxyResponse.body 
+      : JSON.stringify(proxyResponse.body);
+    
+    response = new Response(responseBody, {
+      status: proxyResponse.status,
+      statusText: proxyResponse.status === 200 ? 'OK' : 'Error',
+      headers: proxyResponse.headers,
+    });
+  } else {
+    // Direct fetch
+    response = await fetch(apiEndpoint, {
+      method: "POST",
+      headers: headers,
+      body: body,
+    });
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -118,10 +180,33 @@ export const getUserInfo = async (apiKey: string): Promise<UserInfo> => {
     "xi-api-key": apiKey,
   };
 
-  const response = await fetch(apiEndpoint, {
-    method: "GET",
-    headers: headers,
-  });
+  let response: Response;
+  
+  if (proxyEnabled) {
+    // Use proxy
+    const proxyResponse = await proxyService.makeRequest({
+      url: apiEndpoint,
+      method: "GET",
+      headers,
+    });
+
+    // Convert proxy response to Response-like object
+    const jsonBody = typeof proxyResponse.body === 'string' 
+      ? JSON.parse(proxyResponse.body)
+      : proxyResponse.body;
+    
+    response = new Response(JSON.stringify(jsonBody), {
+      status: proxyResponse.status,
+      statusText: proxyResponse.status === 200 ? 'OK' : 'Error',
+      headers: { 'Content-Type': 'application/json', ...proxyResponse.headers },
+    });
+  } else {
+    // Direct fetch
+    response = await fetch(apiEndpoint, {
+      method: "GET",
+      headers: headers,
+    });
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -155,10 +240,33 @@ export const getVoices = async (apiKey: string): Promise<ApiVoice[]> => {
     "xi-api-key": apiKey,
   };
 
-  const response = await fetch(apiEndpoint, {
-    method: "GET",
-    headers: headers,
-  });
+  let response: Response;
+  
+  if (proxyEnabled) {
+    // Use proxy
+    const proxyResponse = await proxyService.makeRequest({
+      url: apiEndpoint,
+      method: "GET",
+      headers,
+    });
+
+    // Convert proxy response to Response-like object
+    const jsonBody = typeof proxyResponse.body === 'string' 
+      ? JSON.parse(proxyResponse.body)
+      : proxyResponse.body;
+    
+    response = new Response(JSON.stringify(jsonBody), {
+      status: proxyResponse.status,
+      statusText: proxyResponse.status === 200 ? 'OK' : 'Error',
+      headers: { 'Content-Type': 'application/json', ...proxyResponse.headers },
+    });
+  } else {
+    // Direct fetch
+    response = await fetch(apiEndpoint, {
+      method: "GET",
+      headers: headers,
+    });
+  }
 
   if (!response.ok) {
     if (response.status === 401) {

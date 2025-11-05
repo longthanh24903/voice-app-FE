@@ -5,6 +5,7 @@ import {
   generateSpeech,
   getUserInfo,
   getVoices,
+  setProxyEnabled,
 } from "./services/elevenLabsService";
 import {
   GenerationStatus,
@@ -208,6 +209,80 @@ const App: React.FC = () => {
     voiceName: string | null;
     text: string | null;
   }>({ url: null, voiceName: null, text: null });
+
+  // Proxy settings - Load from localStorage
+  const [proxyEnabled, setProxyEnabledState] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('elevenlabs_proxy_enabled');
+      return stored ? JSON.parse(stored) : false;
+    } catch {
+      return false;
+    }
+  });
+  const [proxyServerUrl, setProxyServerUrl] = useState<string>(() => {
+    try {
+      return localStorage.getItem('elevenlabs_proxy_server_url') || 
+             import.meta.env.VITE_PROXY_SERVER_URL || 
+             "http://localhost:3000";
+    } catch {
+      return import.meta.env.VITE_PROXY_SERVER_URL || "http://localhost:3000";
+    }
+  });
+  const [forwardSecret, setForwardSecret] = useState<string>(() => {
+    try {
+      return localStorage.getItem('elevenlabs_proxy_secret') || 
+             import.meta.env.VITE_PROXY_SECRET || 
+             "";
+    } catch {
+      return import.meta.env.VITE_PROXY_SECRET || "";
+    }
+  });
+
+  // Load API keys from localStorage on mount
+  useEffect(() => {
+    const loadStoredKeys = async () => {
+      try {
+        const storedKeys = localStorage.getItem('elevenlabs_api_keys');
+        if (storedKeys) {
+          const keys = JSON.parse(storedKeys);
+          if (keys.length > 0 && Array.isArray(keys)) {
+            await handleImportKeys(keys);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load API keys from localStorage:', error);
+      }
+    };
+    loadStoredKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Save API keys to localStorage when changed
+  useEffect(() => {
+    if (apiKeys.length > 0) {
+      try {
+        const keysToSave = apiKeys.map(k => k.key);
+        localStorage.setItem('elevenlabs_api_keys', JSON.stringify(keysToSave));
+      } catch (error) {
+        console.error('Failed to save API keys to localStorage:', error);
+      }
+    }
+  }, [apiKeys]);
+
+  // Update proxy enabled state in service
+  useEffect(() => {
+    setProxyEnabled(proxyEnabled);
+    localStorage.setItem('elevenlabs_proxy_enabled', JSON.stringify(proxyEnabled));
+  }, [proxyEnabled]);
+
+  // Save proxy settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('elevenlabs_proxy_server_url', proxyServerUrl);
+  }, [proxyServerUrl]);
+
+  useEffect(() => {
+    localStorage.setItem('elevenlabs_proxy_secret', forwardSecret);
+  }, [forwardSecret]);
 
   const t = translations[language];
 
@@ -773,6 +848,12 @@ const App: React.FC = () => {
                 onModelChange={setSelectedModelUiId}
                 t={t}
                 isLoading={isLoading}
+                proxyEnabled={proxyEnabled}
+                onProxyEnabledChange={setProxyEnabledState}
+                proxyServerUrl={proxyServerUrl}
+                onProxyServerUrlChange={setProxyServerUrl}
+                forwardSecret={forwardSecret}
+                onForwardSecretChange={setForwardSecret}
               />
             )}
             {activeTab === Tab.HISTORY && (

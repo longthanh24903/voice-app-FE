@@ -87,3 +87,13 @@ export enum Tab {
   SETTINGS = "SETTINGS",
   HISTORY = "HISTORY",
 }
+
+export interface ProxyLog {
+  id: string;
+  timestamp: Date;
+  type: 'request' | 'success' | 'error' | 'retry';
+  message: string;
+  proxy?: string;
+  status?: number;
+  url?: string;
+}
