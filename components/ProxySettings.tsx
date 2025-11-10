@@ -18,6 +18,7 @@ import {
   saveForwardSecret,
   loadForwardSecret,
   saveProxyEnabled,
+  syncProxiesToBackend,
   type ProxyItem,
 } from "../services/proxyManager";
 
@@ -54,12 +55,21 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const logIntervalRef = useRef<number | null>(null);
+  const syncTimeoutRef = useRef<number | null>(null);
 
-  // Load proxies from storage on mount
+  // Load proxies from storage on mount and sync to backend
   useEffect(() => {
     const loaded = loadProxiesFromStorage();
     setProxies(loaded);
-  }, []);
+    
+    // Sync existing proxies to backend on mount (if server URL is configured)
+    if (loaded.length > 0 && proxyServerUrl) {
+      syncProxiesToBackend(loaded, proxyServerUrl, forwardSecret || undefined).catch((error) => {
+        console.error("Failed to sync proxies to backend on mount:", error);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Save proxies when changed
   useEffect(() => {
@@ -67,6 +77,32 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
       saveProxiesToStorage(proxies);
     }
   }, [proxies]);
+
+  // Sync proxies to backend when changed (if proxy server URL is configured)
+  // Use debounce to avoid spamming backend with requests
+  useEffect(() => {
+    // Clear previous timeout
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+
+    if (proxies.length > 0 && proxyServerUrl) {
+      // Debounce sync by 500ms to avoid multiple rapid updates
+      syncTimeoutRef.current = window.setTimeout(() => {
+        syncProxiesToBackend(proxies, proxyServerUrl, forwardSecret || undefined).catch((error) => {
+          console.error("Failed to sync proxies to backend:", error);
+          // Don't show error to user - silent fail
+        });
+      }, 500);
+    }
+
+    // Cleanup timeout on unmount or dependency change
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, [proxies, proxyServerUrl, forwardSecret]);
 
   // Save settings to localStorage when changed
   useEffect(() => {
@@ -243,13 +279,29 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
   const getLogTypeText = (type: ProxyLog["type"]) => {
     switch (type) {
       case "success":
-        return "Thành công";
+        return "✓ Thành công";
       case "error":
-        return "Lỗi";
+        return "✗ Lỗi";
       case "retry":
-        return "Thử lại";
+        return "↻ Thử lại";
       default:
-        return "Yêu cầu";
+        return "→ Yêu cầu";
+    }
+  };
+
+  const formatProxyDisplay = (proxy?: string) => {
+    if (!proxy) return null;
+    
+    // Format: user:pass@host:port or just host:port
+    try {
+      if (proxy.includes('@')) {
+        const [auth, rest] = proxy.split('@');
+        const [user] = auth.split(':');
+        return `${user}@${rest}`;
+      }
+      return proxy;
+    } catch {
+      return proxy;
     }
   };
 
@@ -433,47 +485,87 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
                 {t.clearLogs}
               </button>
             </div>
-            <div className="h-64 overflow-y-auto bg-stone-50 dark:bg-stone-800/50 rounded-lg border border-stone-200 dark:border-stone-700 p-3 space-y-2">
+            <div className="h-72 overflow-y-auto bg-gradient-to-b from-stone-50 to-stone-100/50 dark:from-stone-900/50 dark:to-stone-800/30 rounded-lg border border-stone-200 dark:border-stone-700 p-3 space-y-2.5">
               {logs.length === 0 ? (
-                <div className="text-sm text-stone-500 dark:text-stone-400 text-center py-8">
-                  {t.noLogsYet}
+                <div className="text-sm text-stone-500 dark:text-stone-400 text-center py-12">
+                  <div className="flex flex-col items-center gap-2">
+                    <InfoIcon className="w-8 h-8 opacity-50" />
+                    <span>{t.noLogsYet}</span>
+                  </div>
                 </div>
               ) : (
                 logs.map((log) => (
                   <div
                     key={log.id}
-                    className={`p-2 rounded border text-xs ${getLogBgColor(
+                    className={`group relative p-3 rounded-lg border-2 transition-all duration-200 hover:shadow-md ${getLogBgColor(
                       log.type
                     )}`}
                   >
-                    <div className="flex items-start gap-2">
-                      {getLogIcon(log.type)}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getLogIcon(log.type)}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        {/* Header: Time and Status Badge */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="font-mono text-[11px] text-stone-500 dark:text-stone-400 font-medium">
                             {formatTime(log.timestamp)}
                           </span>
-                          <span className="text-[10px] font-semibold text-stone-600 dark:text-stone-400">
-                            {getLogTypeText(log.type)}
-                          </span>
-                          {log.status && (
-                            <span className="font-semibold text-stone-700 dark:text-stone-300">
-                              Trạng thái: {log.status}
+                          <div className="flex items-center gap-2">
+                            {log.status && (
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                log.status >= 200 && log.status < 300
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                  : log.status >= 400 && log.status < 500
+                                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                              }`}>
+                                {log.status}
+                              </span>
+                            )}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              log.type === 'success'
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                : log.type === 'error'
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                : log.type === 'retry'
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            }`}>
+                              {getLogTypeText(log.type)}
                             </span>
-                          )}
+                          </div>
                         </div>
-                        <div className="text-stone-700 dark:text-stone-200 break-words">
+                        
+                        {/* Main Message */}
+                        <div className="text-sm font-medium text-stone-800 dark:text-stone-100 break-words leading-relaxed">
                           {log.message}
                         </div>
+                        
+                        {/* Proxy Info - Highlighted */}
                         {log.proxy && (
-                          <div className="mt-1 text-[10px] text-stone-600 dark:text-stone-400 font-mono">
-                            Proxy: {log.proxy}
+                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-stone-200/50 dark:border-stone-700/50">
+                            <span className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">
+                              Proxy:
+                            </span>
+                            <span className="px-2 py-1 rounded-md bg-stone-200/60 dark:bg-stone-700/60 text-[11px] font-mono font-semibold text-stone-800 dark:text-stone-200 border border-stone-300/50 dark:border-stone-600/50">
+                              {formatProxyDisplay(log.proxy)}
+                            </span>
                           </div>
                         )}
+                        
+                        {/* URL - Collapsed by default */}
                         {log.url && (
-                          <div className="mt-1 text-[10px] text-stone-600 dark:text-stone-400 truncate">
-                            URL: {log.url}
-                          </div>
+                          <details className="mt-1.5">
+                            <summary className="text-[10px] text-stone-500 dark:text-stone-400 cursor-pointer hover:text-stone-700 dark:hover:text-stone-300 transition-colors">
+                              Xem URL
+                            </summary>
+                            <div className="mt-1.5 p-2 rounded bg-stone-100/50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700">
+                              <code className="text-[10px] font-mono text-stone-600 dark:text-stone-400 break-all">
+                                {log.url}
+                              </code>
+                            </div>
+                          </details>
                         )}
                       </div>
                     </div>

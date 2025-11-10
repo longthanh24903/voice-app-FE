@@ -115,22 +115,31 @@ export function loadProxyEnabled(): boolean {
  */
 export async function syncProxiesToBackend(
   proxies: ProxyItem[],
-  serverUrl: string
+  serverUrl: string,
+  forwardSecret?: string
 ): Promise<void> {
   try {
     const proxyStrings = proxies.map((p) => p.value).join("\n");
 
-    // Send to backend API endpoint to update proxies.txt
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    // Add forward secret header if provided
+    if (forwardSecret) {
+      headers["x-forward-secret"] = forwardSecret;
+    }
+
+    // Send to backend API endpoint to update proxy list
     const response = await fetch(`${serverUrl}/api/proxies`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({ proxies: proxyStrings }),
     });
 
     if (!response.ok) {
-      throw new Error("Failed to sync proxies to backend");
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to sync proxies to backend");
     }
   } catch (error) {
     console.error("Failed to sync proxies to backend:", error);

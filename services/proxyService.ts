@@ -87,7 +87,9 @@ class ProxyService {
   async makeRequest(request: ProxyRequest): Promise<ProxyResponse> {
     const requestUrl = `${this.proxyServerUrl}/api/proxy-request`;
     
-    this.addLog('request', `Sending request to ${request.url}`, undefined, undefined, request.url);
+    // Extract endpoint name from URL for cleaner log
+    const endpointName = this.extractEndpointName(request.url);
+    this.addLog('request', `Đang gửi yêu cầu: ${endpointName}`, undefined, undefined, request.url);
 
     try {
       const headers: Record<string, string> = {
@@ -110,8 +112,22 @@ class ProxyService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Proxy request failed: ${response.status}`);
+        let errorMessage = `Lỗi ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            if (errorText) {
+              errorMessage = errorText.length > 100 ? errorText.substring(0, 100) + '...' : errorText;
+            }
+          } catch {
+            // Use default error message
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       // Get response body
@@ -144,6 +160,9 @@ class ProxyService {
         responseHeaders[key] = value;
       });
 
+      // Extract proxy info from response header if available (backend includes this)
+      const proxyInfo = response.headers.get('x-proxy-used') || undefined;
+
       const result: ProxyResponse = {
         success: true,
         status: response.status,
@@ -151,12 +170,41 @@ class ProxyService {
         body,
       };
 
-      this.addLog('success', `Request successful`, undefined, response.status, request.url);
+      this.addLog('success', `Thành công: ${endpointName}`, proxyInfo, response.status, request.url);
       
       return result;
     } catch (error: any) {
-      this.addLog('error', `Request failed: ${error.message}`, undefined, undefined, request.url);
+      const errorMsg = error.message || 'Lỗi không xác định';
+      const shortError = errorMsg.length > 80 ? errorMsg.substring(0, 80) + '...' : errorMsg;
+      this.addLog('error', `Thất bại: ${shortError}`, undefined, undefined, request.url);
       throw error;
+    }
+  }
+
+  /**
+   * Extract endpoint name from URL for cleaner log display
+   */
+  private extractEndpointName(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      const path = urlObj.pathname;
+      
+      // Extract meaningful endpoint name
+      if (path.includes('/text-to-speech/')) {
+        return 'Tạo giọng nói';
+      } else if (path.includes('/voices')) {
+        return 'Danh sách giọng';
+      } else if (path.includes('/user')) {
+        return 'Thông tin người dùng';
+      } else if (path.includes('/history')) {
+        return 'Lịch sử';
+      }
+      
+      // Return last part of path or full path if short
+      const parts = path.split('/').filter(Boolean);
+      return parts.length > 0 ? parts[parts.length - 1] : path;
+    } catch {
+      return url.length > 40 ? url.substring(0, 40) + '...' : url;
     }
   }
 
